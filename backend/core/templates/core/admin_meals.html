@@ -1,0 +1,39 @@
+{% extends 'core/base.html' %}
+{% block title %}Manage Meals{% endblock %}
+{% block content %}
+
+<h2 class="text-2xl font-bold mb-4">Meal Management</h2>
+
+<a href="{% url 'add_meal' %}" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded mb-4 inline-block">
+  ➕ Add New Meal
+</a>
+
+<table class="w-full bg-white shadow rounded">
+  <thead class="bg-blue-800 text-white">
+    <tr>
+      <th class="p-2">Image</th>
+      <th class="p-2">Name</th>
+      <th class="p-2">Price</th>
+      <th class="p-2">Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for meal in meals %}
+    <tr class="border-t">
+      <td class="p-2">
+        {% if meal.image %}
+        <img src="{{ meal.image.url }}" class="w-16 h-16 object-cover rounded">
+        {% endif %}
+      </td>
+      <td class="p-2">{{ meal.name }}</td>
+      <td class="p-2">Ksh {{ meal.price }}</td>
+      <td class="p-2 space-x-2">
+        <a href="{% url 'edit_meal' meal.id %}" class="text-blue-600 hover:underline">Edit</a>
+        <a href="{% url 'delete_meal' meal.id %}" class="text-red-600 hover:underline">Delete</a>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+{% endblock %}

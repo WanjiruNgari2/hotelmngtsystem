@@ -5,7 +5,52 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.admin.views.decorators import staff_member_required
 from .models import Order
 from django.shortcuts import render, redirect
+from django.contrib.admin.views.decorators import staff_member_required
+from django.shortcuts import render, get_object_or_404, redirect
 from .models import Meal
+from .forms import MealForm  
+
+
+#view all meals
+@staff_member_required
+def admin_meals_view(request):
+    meals = Meal.objects.all().order_by('-id')
+    return render(request, 'core/admin_meals.html', {'meals': meals})
+
+#add Meals
+@staff_member_required
+def add_meal_view(request):
+    if request.method == 'POST':
+        form = MealForm(request.POST, request.FILES)
+        if form.is_valid():
+            form.save()
+            return redirect('admin_meals')
+    else:
+        form = MealForm()
+    return render(request, 'core/meal_form.html', {'form': form, 'title': 'Add Meal'})
+
+
+#edit meals
+@staff_member_required
+def edit_meal_view(request, meal_id):
+    meal = get_object_or_404(Meal, id=meal_id)
+    if request.method == 'POST':
+        form = MealForm(request.POST, request.FILES, instance=meal)
+        if form.is_valid():
+            form.save()
+            return redirect('admin_meals')
+    else:
+        form = MealForm(instance=meal)
+    return render(request, 'core/meal_form.html', {'form': form, 'title': 'Edit Meal'})
+
+
+#delete meal
+@staff_member_required
+def delete_meal_view(request, meal_id):
+    meal = get_object_or_404(Meal, id=meal_id)
+    meal.delete()
+    return redirect('admin_meals')
+
 
 @login_required
 def place_order(request, meal_id):
