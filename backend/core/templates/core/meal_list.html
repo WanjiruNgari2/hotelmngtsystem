@@ -1,0 +1,26 @@
+{% extends 'core/base.html' %}
+{% block title %}Menu{% endblock %}
+
+{% block content %}
+<h2 class="text-2xl font-bold mb-6">Our Menu</h2>
+
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+  {% for meal in meals %}
+  <div class="bg-white rounded shadow p-4">
+    {% if meal.image %}
+      <img src="{{ meal.image.url }}" class="w-full h-40 object-cover rounded mb-2">
+    {% endif %}
+    <h3 class="text-xl font-semibold">{{ meal.name }}</h3>
+    <p class="text-gray-600 text-sm mb-2">{{ meal.description }}</p>
+    <p class="font-bold text-blue-800 text-lg mb-3">Ksh {{ meal.price }}</p>
+
+    <form method="POST" action="{% url 'place_order' meal.id %}">
+      {% csrf_token %}
+      <button class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded">
+        Order
+      </button>
+    </form>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

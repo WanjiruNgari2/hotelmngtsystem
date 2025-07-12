@@ -1,0 +1,50 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Admin Orders{% endblock %}
+
+{% block content %}
+<h1 class="text-2xl font-bold mb-6">All Orders</h1>
+
+<table class="min-w-full bg-white shadow-md rounded-lg overflow-hidden">
+  <thead class="bg-blue-700 text-white">
+    <tr>
+      <th class="py-2 px-4">Order ID</th>
+      <th class="py-2 px-4">Customer</th>
+      <th class="py-2 px-4">Meal</th>
+      <th class="py-2 px-4">Status</th>
+      <th class="py-2 px-4">Time</th>
+      <th class="py-2 px-4">Update</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for order in orders %}
+    <tr class="border-t">
+      <td class="py-2 px-4">{{ order.id }}</td>
+      <td class="py-2 px-4">{{ order.customer.username }}</td>
+      <td class="py-2 px-4">{{ order.meal.name }}</td>
+      <td class="py-2 px-4">
+        <span class="px-2 py-1 rounded text-sm font-medium {% if order.status == 'pending' %}bg-yellow-100 text-yellow-700{% elif order.status == 'preparing' %}bg-blue-100 text-blue-700{% elif order.status == 'out_for_delivery' %}bg-purple-100 text-purple-700{% else %}bg-green-100 text-green-700{% endif %}">
+          {{ order.status }}
+        </span>
+      </td>
+      <td class="py-2 px-4">{{ order.created_at|date:"Y-m-d H:i" }}</td>
+      <td class="py-2 px-4">
+        <form method="POST" class="flex items-center gap-2">
+          {% csrf_token %}
+          <input type="hidden" name="order_id" value="{{ order.id }}">
+          <select name="status" class="border rounded px-2 py-1">
+            <option value="pending" {% if order.status == 'pending' %}selected{% endif %}>Pending</option>
+            <option value="preparing" {% if order.status == 'preparing' %}selected{% endif %}>Preparing</option>
+            <option value="out_for_delivery" {% if order.status == 'out_for_delivery' %}selected{% endif %}>Out for Delivery</option>
+            <option value="delivered" {% if order.status == 'delivered' %}selected{% endif %}>Delivered</option>
+          </select>
+          <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded">
+            Update
+          </button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}
