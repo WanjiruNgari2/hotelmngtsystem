@@ -1,0 +1,40 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Leave Feedback{% endblock %}
+
+{% block content %}
+<div class="max-w-xl mx-auto bg-white shadow-md rounded px-8 pt-6 pb-8 mt-10">
+  <h2 class="text-xl font-semibold mb-4">Feedback for Order #{{ order.id }}</h2>
+
+  <form method="POST">
+    {% csrf_token %}
+    <div class="mb-4">
+      {{ form.rating.label_tag }}
+      {{ form.rating }}
+      {% if form.rating.errors %}
+        <p class="text-red-500 text-sm">{{ form.rating.errors }}</p>
+      {% endif %}
+    </div>
+
+    <div class="mb-4">
+      {{ form.tip.label_tag }}
+      {{ form.tip }}
+      {% if form.tip.errors %}
+        <p class="text-red-500 text-sm">{{ form.tip.errors }}</p>
+      {% endif %}
+    </div>
+
+    <div class="mb-4">
+      {{ form.review.label_tag }}
+      {{ form.review }}
+      {% if form.review.errors %}
+        <p class="text-red-500 text-sm">{{ form.review.errors }}</p>
+      {% endif %}
+    </div>
+
+    <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+      Submit Feedback
+    </button>
+  </form>
+</div>
+{% endblock %}

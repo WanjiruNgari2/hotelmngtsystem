@@ -1,31 +1,84 @@
 {% extends 'core/base.html' %}
 {% block title %}My Orders{% endblock %}
-
 {% block content %}
-<h2 class="text-2xl font-bold mb-6">My Orders</h2>
 
-<table class="w-full bg-white shadow rounded overflow-hidden">
-  <thead class="bg-blue-800 text-white">
-    <tr>
-      <th class="py-2 px-4">Meal</th>
-      <th class="py-2 px-4">Status</th>
-      <th class="py-2 px-4">Ordered On</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for order in orders %}
-    <tr class="border-t">
-      <td class="py-2 px-4">{{ order.meal.name }}</td>
-      <td class="py-2 px-4">
-        <span class="text-sm font-medium px-2 py-1 rounded {% if order.status == 'pending' %}bg-yellow-100 text-yellow-800{% elif order.status == 'preparing' %}bg-blue-100 text-blue-800{% elif order.status == 'out_for_delivery' %}bg-purple-100 text-purple-800{% else %}bg-green-100 text-green-800{% endif %}">
-          {{ order.status }}
-        </span>
-      </td>
-      <td class="py-2 px-4">{{ order.created_at|date:"Y-m-d H:i" }}</td>
-    </tr>
-    {% empty %}
-    <tr><td colspan="3" class="p-4 text-center text-gray-500">You haven’t ordered anything yet.</td></tr>
-    {% endfor %}
-  </tbody>
-</table>
+<div class="max-w-6xl mx-auto p-6">
+  <h1 class="text-2xl font-bold text-gray-800 mb-6">🧾 My Orders</h1>
+
+  <div class="bg-white shadow rounded-lg overflow-hidden">
+    <table class="min-w-full divide-y divide-gray-200 text-sm text-left">
+      <thead class="bg-gray-100 text-gray-700 uppercase text-xs">
+        <tr>
+          <th class="px-6 py-3">Image</th>
+          <th class="px-6 py-3">Meal</th>
+          <th class="px-6 py-3">Status</th>
+          <th class="px-6 py-3">Ordered On</th>
+          <th class="px-6 py-3">Feedback</th>
+          <th class="px-6 py-3">Actions</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100">
+        {% for order in page_obj %}
+        <tr>
+          <td class="px-6 py-4">
+            {% if order.meal.image %}
+              <img src="{{ order.meal.image.url }}" alt="{{ order.meal.name }}" class="h-12 w-12 object-cover rounded" />
+            {% else %}
+              <span class="text-gray-400 text-xs italic">No image</span>
+            {% endif %}
+          </td>
+          <td class="px-6 py-4 font-medium">{{ order.meal.name }}</td>
+          <td class="px-6 py-4">
+            <span class="px-2 inline-block py-1 text-xs font-semibold rounded bg-blue-100 text-blue-700">
+              {{ order.status|title }}
+            </span>
+          </td>
+          <td class="px-6 py-4 text-gray-600">{{ order.created_at|date:"Y-m-d H:i" }}</td>
+          <td class="px-6 py-4">
+            {% if order.rating %}
+              <div class="text-green-700 text-sm">
+                ⭐ {{ order.rating }}/5 <br>
+                💰 Ksh {{ order.tip|default:"0.00" }} <br>
+                <em class="text-gray-600">{{ order.review }}</em>
+              </div>
+            {% else %}
+              <span class="text-gray-400 italic text-sm">No feedback</span>
+            {% endif %}
+          </td>
+          <td class="px-6 py-4 space-x-2">
+            {% if order.status == 'delivered' %}
+              <a href="{% url 'leave_feedback' order.id %}"
+                class="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 text-sm rounded">
+                {% if order.rating %}Edit Feedback{% else %}Leave Feedback{% endif %}
+              </a>
+            {% else %}
+              <span class="text-gray-400 text-xs">Pending</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="6" class="text-center text-gray-500 p-6">No orders found.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination Controls -->
+  <div class="mt-6 flex justify-center space-x-2">
+    {% if page_obj.has_previous %}
+      <a href="?page=1" class="px-3 py-1 text-sm bg-gray-200 rounded hover:bg-gray-300">First</a>
+      <a href="?page={{ page_obj.previous_page_number }}" class="px-3 py-1 text-sm bg-gray-200 rounded hover:bg-gray-300">Previous</a>
+    {% endif %}
+
+    <span class="px-4 py-1 text-sm text-gray-700">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+
+    {% if page_obj.has_next %}
+      <a href="?page={{ page_obj.next_page_number }}" class="px-3 py-1 text-sm bg-gray-200 rounded hover:bg-gray-300">Next</a>
+      <a href="?page={{ page_obj.paginator.num_pages }}" class="px-3 py-1 text-sm bg-gray-200 rounded hover:bg-gray-300">Last</a>
+    {% endif %}
+  </div>
+</div>
+
 {% endblock %}

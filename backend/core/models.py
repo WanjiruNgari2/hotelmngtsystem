@@ -44,7 +44,8 @@ class Order(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     is_delivery = models.BooleanField(default=False)
     tip = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
-    rating = models.PositiveIntegerField(null=True, blank=True)  # optional 1–5 stars
+    rating = models.PositiveIntegerField(null=True, blank=True)
+    review = models.TextField(null=True, blank=True)
 
     def __str__(self):
         return f"Order #{self.id} - {self.meal.name} by {self.customer.username}"

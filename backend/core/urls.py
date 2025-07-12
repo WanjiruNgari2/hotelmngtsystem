@@ -14,5 +14,8 @@ urlpatterns = [
     path('dashboard/admin/meals/add/', views.add_meal_view, name='add_meal'),
     path('dashboard/admin/meals/<int:meal_id>/edit/', views.edit_meal_view, name='edit_meal'),
     path('dashboard/admin/meals/<int:meal_id>/delete/', views.delete_meal_view, name='delete_meal'),
+#add feedback url
+    path('my-orders/<int:order_id>/feedback/', views.leave_feedback, name='leave_feedback'),
+
 
 ]
