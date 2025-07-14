@@ -1,13 +1,156 @@
 from django.shortcuts import render, redirect, get_object_or_404
+from django.db import models
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.decorators import login_required
 from django.contrib.admin.views.decorators import staff_member_required
 from django.core.paginator import Paginator
-
-from .models import Meal, Order
+from django.utils import timezone
+from .models import User, Meal, Order, WaiterProfile, Feedback
 from .forms import MealForm, FeedbackForm
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from .models import Feedback
+from .serializers import FeedbackSerializer, MealWithFeedbackSerializer, MealSerializer
+from django.db.models import Sum
 
+
+# ROLEBASED REPORT:
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def role_report_view(request):
+    if request.user.role != 'admin':
+        return Response({"error": "Access denied"}, status=403)
+
+    role = request.GET.get('role')
+
+    if role not in dict(User.ROLE_CHOICES):
+        return Response({"error": "Invalid role"}, status=400)
+
+    users = User.objects.filter(role=role)
+    data = []
+
+    for user in users:
+        user_orders = Order.objects.filter(customer=user)
+        total_orders = user_orders.count()
+        total_tips = user_orders.aggregate(total=models.Sum('tip'))['total'] or 0
+
+        data.append({
+            "username": user.username,
+            "email": user.email,
+            "total_orders": total_orders,
+            "total_tips": float(total_tips),
+        })
+
+    return Response({
+        "role": role,
+        "user_count": users.count(),
+        "report": data
+    })
+
+# ADMIN OVERALL VIEW:
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def admin_stats_view(request):
+    if request.user.role != 'admin':
+        return Response({"error": "Access denied"}, status=403)
+
+    total_users = User.objects.count()
+    users_by_role = User.objects.values('role').order_by().annotate(count=models.Count('id'))
+    user_roles_dict = {item['role']: item['count'] for item in users_by_role}
+
+    total_orders = Order.objects.count()
+    total_meals = Meal.objects.count()
+    total_feedback = Feedback.objects.count()
+    total_tips = Order.objects.aggregate(total=models.Sum('tip'))['total'] or 0
+
+    return Response({
+        "total_users": total_users,
+        "users_by_role": user_roles_dict,
+        "total_orders": total_orders,
+        "total_meals": total_meals,
+        "total_feedback": total_feedback,
+        "total_tips": f"{total_tips:.2f}"
+    })
+    
+
+ #MEAL AVAILABILITY
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated])
+def toggle_meal_availability(request, pk):
+    if request.user.role != 'waiter':
+        return Response({"error": "Access denied"}, status=403)
+
+    try:
+        meal = Meal.objects.get(pk=pk)
+    except Meal.DoesNotExist:
+        return Response({"error": "Meal not found"}, status=404)
+
+    serializer = MealAvailabilitySerializer(meal, data=request.data, partial=True)
+    if serializer.is_valid():
+        serializer.save()
+        return Response({"message": "Availability updated", "meal": serializer.data})
+    return Response(serializer.errors, status=400)
+
+#PUBLIC VIEW OF MENU
+@api_view(['GET'])
+def public_menu(request):
+    meals = Meal.objects.filter(is_available=True)
+    serializer = MealSerializer(meals, many=True)
+    return Response(serializer.data)
+
+
+#CLOCK IN/OUT
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def clock_in(request):
+    if request.user.role != 'waiter':
+        return Response({"error": "Access denied"}, status=403)
+
+    profile = WaiterProfile.objects.get(user=request.user)
+    profile.clock_in_time = timezone.now()
+    profile.clock_out_time = None  # Reset previous clock-out
+    profile.save()
+    return Response({"message": "Clocked in", "time": profile.clock_in_time})
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def clock_out(request):
+    if request.user.role != 'waiter':
+        return Response({"error": "Access denied"}, status=403)
+
+    profile = WaiterProfile.objects.get(user=request.user)
+    profile.clock_out_time = timezone.now()
+    profile.save()
+
+    worked_hours = profile.hours_worked()
+    return Response({
+        "message": "Clocked out",
+        "time": profile.clock_out_time,
+        "hours_worked": str(worked_hours)
+    })
+
+
+#waiter dashboard
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def waiter_dashboard(request):
+    if request.user.role != 'waiter':
+        return Response({"error": "Access denied"}, status=403)
+
+    meals = Meal.objects.all()
+    serializer = MealWithFeedbackSerializer(meals, many=True)
+    return Response(serializer.data)
+
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def meal_feedback(request, meal_id):
+    feedbacks = Feedback.objects.filter(meal_id=meal_id)
+    serializer = FeedbackSerializer(feedbacks, many=True)
+    return Response(serializer.data)
 
 # LOGIN VIEW
 def login_view(request):
