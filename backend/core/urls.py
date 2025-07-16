@@ -36,7 +36,7 @@ urlpatterns = [
     path('api/meals/<int:meal_id>/feedback/', meal_feedback, name='meal-feedback'),
     path('api-token-auth/', obtain_auth_token),
     path('api/waiter/dashboard/', waiter_dashboard, name='waiter_dashboard'),
-    path('api/waiter/meals/<int:pk>/toggle/', toggle_meal_availability, name='toggle_meal_availability'),
+    path('api/waiter/meals/<int:meal_id>/toggle/', toggle_meal_availability, name='toggle_meal_availability'),
     
     # Clock In/Out (using class-based views)
     path('api/waiter/clock-in/', ClockInView.as_view(), name='clock_in'),

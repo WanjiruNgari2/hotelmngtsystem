@@ -10,7 +10,8 @@ from django.utils import timezone
 from django.db.models import Sum
 
 # DRF
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, authentication_classes
+from rest_framework.authentication import TokenAuthentication
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
@@ -142,6 +143,22 @@ def toggle_meal_availability(request, pk):
         serializer.save()
         return Response({"message": "Availability updated", "meal": serializer.data})
     return Response(serializer.errors, status=400)
+@api_view(['POST'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def toggle_meal_availability(request, meal_id):
+    user = request.user
+    if user.role not in ['waiter', 'cook', 'manager', 'admin']:
+        return Response({'error': 'Not authorized to toggle meals.'}, status=403)
+    
+    try:
+        meal = Meal.objects.get(id=meal_id)
+        meal.is_available = not meal.is_available
+        meal.save()
+        return Response({'message': 'Meal availability toggled.', 'is_available': meal.is_available})
+    except Meal.DoesNotExist:
+        return Response({'error': 'Meal not found.'}, status=404)
+    
 
 @api_view(['GET'])
 def public_menu(request):
