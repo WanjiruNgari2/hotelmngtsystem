@@ -1,3 +1,4 @@
+# Django Core
 from django.shortcuts import render, redirect, get_object_or_404
 from django.db import models
 from django.contrib.auth import authenticate, login, logout
@@ -6,17 +7,70 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.admin.views.decorators import staff_member_required
 from django.core.paginator import Paginator
 from django.utils import timezone
-from .models import User, Meal, Order, WaiterProfile, Feedback
-from .forms import MealForm, FeedbackForm
+from django.db.models import Sum
+
+# DRF
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from .models import Feedback
-from .serializers import FeedbackSerializer, MealWithFeedbackSerializer, MealSerializer
-from django.db.models import Sum
+from rest_framework.views import APIView
+from rest_framework import status
+
+# Local Models
+from .models import User, Meal, Order, WaiterProfile, Feedback, ClockInRecord
+from .forms import MealForm, FeedbackForm
+from .serializers import (
+    FeedbackSerializer, 
+    MealWithFeedbackSerializer, 
+    MealSerializer,
+    ClockInRecordSerializer
+)
+
+# ======================
+# API VIEWS (DRF)
+# ======================
+
+class ClockInView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        if request.user.role != 'waiter':
+            return Response({'error': 'Only waiters can clock in'}, status=403)
+
+        active_shift = ClockInRecord.objects.filter(waiter=request.user, clock_out_time__isnull=True).first()
+        if active_shift:
+            return Response({'error': 'Already clocked in. Please clock out first.'}, status=400)
+
+        record = ClockInRecord.objects.create(waiter=request.user)
+        return Response({'message': 'Clock-in successful'}, status=201)
+
+class ClockOutView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        if request.user.role != 'waiter':
+            return Response({'error': 'Only waiters can clock out'}, status=403)
+
+        active_shift = ClockInRecord.objects.filter(waiter=request.user, clock_out_time__isnull=True).first()
+        if not active_shift:
+            return Response({'error': 'No active shift to clock out from'}, status=400)
+
+        active_shift.clock_out_time = timezone.now()
+        active_shift.save()
+        return Response({'message': 'Clock-out successful'}, status=200)
 
 
-# ROLEBASED REPORT:
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def current_shifts(request):
+    active_shifts = ClockInRecord.objects.filter(
+        waiter=request.user,
+        clock_out_time__isnull=True
+    )
+    serializer = ClockInRecordSerializer(active_shifts, many=True)
+    return Response(serializer.data)
+
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def role_report_view(request):
@@ -24,7 +78,6 @@ def role_report_view(request):
         return Response({"error": "Access denied"}, status=403)
 
     role = request.GET.get('role')
-
     if role not in dict(User.ROLE_CHOICES):
         return Response({"error": "Invalid role"}, status=400)
 
@@ -49,7 +102,6 @@ def role_report_view(request):
         "report": data
     })
 
-# ADMIN OVERALL VIEW:
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def admin_stats_view(request):
@@ -73,9 +125,7 @@ def admin_stats_view(request):
         "total_feedback": total_feedback,
         "total_tips": f"{total_tips:.2f}"
     })
-    
 
- #MEAL AVAILABILITY
 @api_view(['PATCH'])
 @permission_classes([IsAuthenticated])
 def toggle_meal_availability(request, pk):
@@ -93,46 +143,12 @@ def toggle_meal_availability(request, pk):
         return Response({"message": "Availability updated", "meal": serializer.data})
     return Response(serializer.errors, status=400)
 
-#PUBLIC VIEW OF MENU
 @api_view(['GET'])
 def public_menu(request):
     meals = Meal.objects.filter(is_available=True)
     serializer = MealSerializer(meals, many=True)
     return Response(serializer.data)
 
-
-#CLOCK IN/OUT
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def clock_in(request):
-    if request.user.role != 'waiter':
-        return Response({"error": "Access denied"}, status=403)
-
-    profile = WaiterProfile.objects.get(user=request.user)
-    profile.clock_in_time = timezone.now()
-    profile.clock_out_time = None  # Reset previous clock-out
-    profile.save()
-    return Response({"message": "Clocked in", "time": profile.clock_in_time})
-
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def clock_out(request):
-    if request.user.role != 'waiter':
-        return Response({"error": "Access denied"}, status=403)
-
-    profile = WaiterProfile.objects.get(user=request.user)
-    profile.clock_out_time = timezone.now()
-    profile.save()
-
-    worked_hours = profile.hours_worked()
-    return Response({
-        "message": "Clocked out",
-        "time": profile.clock_out_time,
-        "hours_worked": str(worked_hours)
-    })
-
-
-#waiter dashboard
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def waiter_dashboard(request):
@@ -143,8 +159,6 @@ def waiter_dashboard(request):
     serializer = MealWithFeedbackSerializer(meals, many=True)
     return Response(serializer.data)
 
-
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def meal_feedback(request, meal_id):
@@ -152,7 +166,10 @@ def meal_feedback(request, meal_id):
     serializer = FeedbackSerializer(feedbacks, many=True)
     return Response(serializer.data)
 
-# LOGIN VIEW
+# ======================
+# TEMPLATE VIEWS
+# ======================
+
 def login_view(request):
     if request.method == 'POST':
         form = AuthenticationForm(data=request.POST)
@@ -160,7 +177,6 @@ def login_view(request):
             user = form.get_user()
             login(request, user)
 
-            # Redirect by role
             if user.role in ['onsite_customer', 'online_customer']:
                 return redirect('customer_dashboard')
             elif user.role == 'waiter':
@@ -168,25 +184,19 @@ def login_view(request):
             elif user.role == 'admin':
                 return redirect('/admin/')
             else:
-                return redirect('default_dashboard')  # fallback
+                return redirect('default_dashboard')
     else:
         form = AuthenticationForm()
     return render(request, 'core/login.html', {'form': form})
 
-
-# LOGOUT
 def logout_view(request):
     logout(request)
     return redirect('login')
 
-
-# CUSTOMER DASHBOARD
 @login_required
 def customer_dashboard(request):
     return render(request, 'core/dashboard_customer.html')
 
-
-# VIEW MEALS (Customer)
 @login_required
 def meal_list_view(request):
     if request.user.role not in ['online_customer', 'onsite_customer']:
@@ -194,8 +204,6 @@ def meal_list_view(request):
     meals = Meal.objects.all()
     return render(request, 'core/meal_list.html', {'meals': meals})
 
-
-# PLACE ORDER
 @login_required
 def place_order(request, meal_id):
     if request.method == 'POST' and request.user.role in ['online_customer', 'onsite_customer']:
@@ -208,28 +216,24 @@ def place_order(request, meal_id):
         return redirect('my_orders')
     return redirect('meal_list')
 
-
-# CUSTOMER ORDER HISTORY
 @login_required
 def my_orders_view(request):
     if request.user.role not in ['online_customer', 'onsite_customer']:
         return redirect('login')
 
     orders = Order.objects.filter(customer=request.user).order_by('-created_at')
-    paginator = Paginator(orders, 5)  # Show 5 orders per page
+    paginator = Paginator(orders, 5)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
     return render(request, 'core/my_orders.html', {'page_obj': page_obj})
 
-
-# LEAVE FEEDBACK
 @login_required
 def leave_feedback(request, order_id):
     order = get_object_or_404(Order, id=order_id, customer=request.user)
 
     if order.status != 'delivered':
-        return redirect('my_orders')  # Only allow feedback after delivery
+        return redirect('my_orders')
 
     if request.method == 'POST':
         form = FeedbackForm(request.POST, instance=order)
@@ -241,8 +245,6 @@ def leave_feedback(request, order_id):
 
     return render(request, 'core/leave_feedback.html', {'form': form, 'order': order})
 
-
-# ADMIN DASHBOARD: VIEW ORDERS
 @staff_member_required
 def admin_orders_view(request):
     orders = Order.objects.all().order_by('-created_at')
@@ -257,15 +259,11 @@ def admin_orders_view(request):
 
     return render(request, 'core/admin_orders.html', {'orders': orders})
 
-
-# ADMIN: VIEW MEALS
 @staff_member_required
 def admin_meals_view(request):
     meals = Meal.objects.all().order_by('-id')
     return render(request, 'core/admin_meals.html', {'meals': meals})
 
-
-# ADMIN: ADD MEAL
 @staff_member_required
 def add_meal_view(request):
     if request.method == 'POST':
@@ -277,8 +275,6 @@ def add_meal_view(request):
         form = MealForm()
     return render(request, 'core/meal_form.html', {'form': form, 'title': 'Add Meal'})
 
-
-# ADMIN: EDIT MEAL
 @staff_member_required
 def edit_meal_view(request, meal_id):
     meal = get_object_or_404(Meal, id=meal_id)
@@ -291,8 +287,6 @@ def edit_meal_view(request, meal_id):
         form = MealForm(instance=meal)
     return render(request, 'core/meal_form.html', {'form': form, 'title': 'Edit Meal'})
 
-
-# ADMIN: DELETE MEAL
 @staff_member_required
 def delete_meal_view(request, meal_id):
     meal = get_object_or_404(Meal, id=meal_id)

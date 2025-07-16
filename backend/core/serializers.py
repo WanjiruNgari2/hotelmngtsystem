@@ -1,5 +1,14 @@
 from rest_framework import serializers
-from .models import Meal, Feedback
+from .models import Meal, Feedback, ClockInRecord
+
+
+
+class ClockInRecordSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ClockInRecord
+        fields = '__all__'
+        read_only_fields = ['waiter', 'clock_in_time']
+
 
 class MealWithFeedbackSerializer(serializers.ModelSerializer):
     average_rating = serializers.SerializerMethodField(read_only=True)

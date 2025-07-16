@@ -1,9 +1,63 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.conf import settings
+from django.utils import timezone
+from django.contrib.auth.models import AbstractUser
+from django.contrib.auth.base_user import BaseUserManager
 
-# Custom User Model
+
+#clockInRecord
+class ClockInRecord(models.Model):
+    waiter = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    clock_in_time = models.DateTimeField(default=timezone.now)
+    clock_out_time = models.DateTimeField(null=True, blank=True)
+
+    def is_active(self):
+        return self.clock_out_time is None
+
+    def __str__(self):
+        return f"{self.waiter.get_full_name()} - {self.clock_in_time} to {self.clock_out_time or 'Present'}"
+
+    def save(self, *args, **kwargs):
+            # Prevent active shifts > 12 hours
+            if self.clock_out_time is None:
+                max_duration = timedelta(hours=12)
+                if timezone.now() - self.clock_in_time > max_duration:
+                    self.clock_out_time = self.clock_in_time + max_duration
+            super().save(*args, **kwargs)
+
+
+class UserManager(BaseUserManager):
+    use_in_migrations = True
+
+    def create_user(self, email, password=None, **extra_fields):
+        if not email:
+            raise ValueError('Users must have an email address')
+
+        email = self.normalize_email(email)
+        extra_fields.setdefault('is_active', True)
+
+        user = self.model(email=email, **extra_fields)
+        user.set_password(password)
+        user.save(using=self._db)
+        return user
+
+    def create_superuser(self, email, password=None, **extra_fields):
+        extra_fields.setdefault('is_staff', True)
+        extra_fields.setdefault('is_superuser', True)
+        extra_fields.setdefault('role', 'admin')  # You can adjust this
+
+        if extra_fields.get('is_staff') is not True:
+            raise ValueError('Superuser must have is_staff=True.')
+        if extra_fields.get('is_superuser') is not True:
+            raise ValueError('Superuser must have is_superuser=True.')
+
+        return self.create_user(email, password, **extra_fields)
+
 class User(AbstractUser):
+    username = None
+    email = models.EmailField(unique=True)
+
     ROLE_CHOICES = [
         ('admin', 'Admin'),
         ('onsite_customer', 'Onsite Customer'),
@@ -16,9 +70,18 @@ class User(AbstractUser):
         ('manager', 'Manager'),
     ]
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='online_customer')
+    is_active = models.BooleanField(default=True)
+    is_staff = models.BooleanField(default=False)
+
+    USERNAME_FIELD = 'email'
+    REQUIRED_FIELDS = ['first_name', 'last_name']
+
+    objects = UserManager()  # 👈 connect the manager here
 
     def __str__(self):
-        return f"{self.username} ({self.get_role_display()})"
+        return f"{self.email} ({self.get_role_display()})"
+
+
 
 #waiter profile
 class WaiterProfile(models.Model):
