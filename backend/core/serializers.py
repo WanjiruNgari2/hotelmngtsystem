@@ -1,18 +1,69 @@
 from rest_framework import serializers
-from .models import Meal, Feedback, ClockInRecord
+from django.contrib.auth import get_user_model
+from .models import (
+    Meal, Feedback, ClockInRecord,
+    DeliveryPersonnelProfile, ProofOfDelivery
+)
 
+User = get_user_model()
 
+# ----------------------
+# User Serializer
+# ----------------------
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id', 'email', 'role', 'password']
+        extra_kwargs = {'password': {'write_only': True}}
 
+    def create(self, validated_data):
+        password = validated_data.pop("password", None)
+        user = User(**validated_data)
+        if password:
+            user.set_password(password)
+        user.save()
+        return user
+
+# ----------------------
+# Delivery Profile
+# ----------------------
+class DeliveryProfileSerializer(serializers.ModelSerializer):
+    user = UserSerializer()
+
+    class Meta:
+        model = DeliveryPersonnelProfile
+        fields = [
+            'user',
+            'profile_picture',
+            'transport_method',
+            'current_location',
+            'upvotes',
+            'tips_earned'
+        ]
+        read_only_fields = ['upvotes', 'tips_earned']
+
+    def create(self, validated_data):
+        user_data = validated_data.pop('user')
+        user_data['role'] = 'delivery'
+        user = User.objects.create_user(**user_data)
+        profile = DeliveryPersonnelProfile.objects.create(user=user, **validated_data)
+        return profile
+
+# ----------------------
+# Clock In / Out
+# ----------------------
 class ClockInRecordSerializer(serializers.ModelSerializer):
     class Meta:
         model = ClockInRecord
         fields = '__all__'
         read_only_fields = ['waiter', 'clock_in_time']
 
-
+# ----------------------
+# Meal + Feedback
+# ----------------------
 class MealWithFeedbackSerializer(serializers.ModelSerializer):
-    average_rating = serializers.SerializerMethodField(read_only=True)
-    top_feedback = serializers.SerializerMethodField(read_only=True)
+    average_rating = serializers.SerializerMethodField()
+    top_feedback = serializers.SerializerMethodField()
 
     class Meta:
         model = Meal
@@ -28,6 +79,9 @@ class MealWithFeedbackSerializer(serializers.ModelSerializer):
         feedbacks = Feedback.objects.filter(meal=meal).order_by('-created_at')[:3]
         return [f"{f.customer.username}: {f.comment}" for f in feedbacks if f.comment]
 
+# ----------------------
+# Feedback
+# ----------------------
 class FeedbackSerializer(serializers.ModelSerializer):
     customer_name = serializers.CharField(source='customer.username', read_only=True)
     comment = serializers.CharField(required=False)
@@ -42,7 +96,19 @@ class FeedbackSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Rating must be between 1 and 5.")
         return value
 
+# ----------------------
+# Meals
+# ----------------------
 class MealSerializer(serializers.ModelSerializer):
     class Meta:
         model = Meal
         fields = ['id', 'name', 'description', 'price', 'image', 'category', 'is_available']
+
+# ----------------------
+# Proof of Delivery Upload
+# ----------------------
+class ProofOfDeliverySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProofOfDelivery
+        fields = ['id', 'order', 'image', 'uploaded_at']
+        read_only_fields = ['uploaded_at']

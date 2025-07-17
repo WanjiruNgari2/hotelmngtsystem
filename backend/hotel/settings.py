@@ -1,7 +1,7 @@
 """
 Django settings for hotel project.
 """
-
+import os
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -25,6 +25,10 @@ INSTALLED_APPS = [
     'core',
 ]
 
+# Custom User Model
+AUTH_USER_MODEL = 'core.User'
+
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -40,8 +44,7 @@ ROOT_URLCONF = 'hotel.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
-        'APP_DIRS': True,
+    'DIRS': [os.path.join(BASE_DIR, 'core', 'templates')],        'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
                 'django.template.context_processors.request',
@@ -88,8 +91,6 @@ USE_TZ = True
 STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# Custom User Model
-AUTH_USER_MODEL = 'core.User'
 
 # REST Framework Configuration
 REST_FRAMEWORK = {

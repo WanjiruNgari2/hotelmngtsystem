@@ -1,5 +1,5 @@
 from django import forms
-from .models import Meal, Order
+from .models import Meal, Order, Feedback
 
 
 class MealForm(forms.ModelForm):
@@ -13,8 +13,8 @@ from .models import Order
 
 class FeedbackForm(forms.ModelForm):
     class Meta:
-        model = Order
-        fields = ['rating', 'tip', 'review']
+        model = Feedback
+        fields = ['rating', 'tip', 'comment']
 
         widgets = {
             'rating': forms.NumberInput(attrs={
