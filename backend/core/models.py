@@ -31,6 +31,7 @@ class User(AbstractBaseUser, PermissionsMixin):
         ('onsite_customer', 'Onsite Customer'),
         ('online_customer', 'Online Customer'),
         ('delivery', 'Delivery Personnel'),
+        ('receptionist', 'Receptionist'),
     ]
 
     email = models.EmailField(unique=True)
@@ -159,3 +160,43 @@ class ProofOfDelivery(models.Model):
 
     def __str__(self):
         return f"Proof for Order #{self.order.id}"
+
+
+class ReceptionistProfile(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    full_name = models.CharField(max_length=255, default="Receptionist User")
+    profile_picture = models.ImageField(upload_to='receptionists/', blank=True, null=True)
+    gender = models.CharField(max_length=10, choices=[('Male', 'Male'), ('Female', 'Female')], blank=True)
+    clock_in_time = models.DateTimeField(blank=True, null=True)
+    clock_out_time = models.DateTimeField(blank=True, null=True)
+
+    def __str__(self):
+        return f"Receptionist: {self.user.email}"
+
+
+# Duty roaster
+class ShiftRoster(models.Model):
+    receptionist = models.ForeignKey(ReceptionistProfile, on_delete=models.CASCADE)
+    shift_date = models.DateField()
+    shift_start = models.TimeField()
+    shift_end = models.TimeField()
+    is_on_duty = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"{self.receptionist.user.email} shift on {self.shift_date}"
+
+# CRM calllogs
+class CRMCallLog(models.Model):
+    receptionist = models.ForeignKey(ReceptionistProfile, on_delete=models.CASCADE)
+    customer_name = models.CharField(max_length=255)
+    phone_number = models.CharField(max_length=20)
+    call_time = models.DateTimeField(default=timezone.now)  # Make sure this exists
+    notes = models.TextField(blank=True)
+    reason_for_call = models.TextField()
+    follow_up_date = models.DateField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Call with {self.customer_name} at {self.call_time}"
+
+

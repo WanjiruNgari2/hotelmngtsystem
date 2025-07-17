@@ -1,4 +1,5 @@
 # Django Core
+from rest_framework import filters  
 from django.shortcuts import render, redirect, get_object_or_404
 from django.db import models
 from django.contrib import messages
@@ -9,23 +10,25 @@ from django.contrib.admin.views.decorators import staff_member_required
 from django.core.paginator import Paginator
 from django.utils import timezone
 from django.db.models import Sum
+from django_filters.rest_framework import DjangoFilterBackend
+
 
 # DRF
-from rest_framework.decorators import api_view, permission_classes, authentication_classes
+from rest_framework import status, permissions, viewsets
+from rest_framework.decorators import api_view, permission_classes, authentication_classes, action
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.views import APIView
-from rest_framework import status
 
 # Local Models
-from .models import User, Meal, Order, WaiterProfile, Feedback, ClockInRecord, DeliveryPersonnelProfile
+from .models import User, Meal, Order, WaiterProfile, Feedback, ClockInRecord, DeliveryPersonnelProfile, ReceptionistProfile, ShiftRoster, CRMCallLog
 from .forms import MealForm, FeedbackForm
 from .serializers import (
     FeedbackSerializer, 
     MealWithFeedbackSerializer, 
-    MealSerializer,
+    MealSerializer, ReceptionistProfileSerializer, CRMCallLogSerializer, ShiftRosterSerializer,
     ClockInRecordSerializer,
     DeliveryProfileSerializer
 )
@@ -176,6 +179,69 @@ def meal_feedback(request, meal_id):
     feedbacks = Feedback.objects.filter(meal_id=meal_id)
     serializer = FeedbackSerializer(feedbacks, many=True)
     return Response(serializer.data)
+
+
+class IsReceptionistOrAdmin(permissions.BasePermission):
+    """
+    Allow access if user is a receptionist accessing their own data
+    or if the user is an admin.
+    """
+
+    def has_permission(self, request, view):
+        return request.user.is_authenticated
+
+    def has_object_permission(self, request, view, obj):
+        if request.user.role == 'admin':
+            return True
+        elif request.user.role == 'receptionist':
+            return obj.user == request.user
+        return False
+
+
+class ReceptionistProfileViewSet(viewsets.ModelViewSet):
+    queryset = ReceptionistProfile.objects.all()
+    serializer_class = ReceptionistProfileSerializer
+    permission_classes = [IsReceptionistOrAdmin]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    filterset_fields = ['gender']
+    search_fields = ['user__email', 'user__full_name']
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.role == 'admin':
+            return ReceptionistProfile.objects.all()
+        elif user.role == 'receptionist':
+            return ReceptionistProfile.objects.filter(user=user)
+        return ReceptionistProfile.objects.none()
+
+
+class ShiftRosterViewSet(viewsets.ModelViewSet):
+    queryset = ShiftRoster.objects.all()
+    serializer_class = ShiftRosterSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.role == 'admin':
+            return ShiftRoster.objects.all()
+        elif user.role == 'receptionist':
+            return ShiftRoster.objects.filter(receptionist__user=user)
+        return ShiftRoster.objects.none()
+
+
+class CRMCallLogViewSet(viewsets.ModelViewSet):
+    queryset = CRMCallLog.objects.all()
+    serializer_class = CRMCallLogSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.role == 'admin':
+            return CRMCallLog.objects.all()
+        elif user.role == 'receptionist':
+            return CRMCallLog.objects.filter(receptionist__user=user)
+        return CRMCallLog.objects.none()
+
 
 # Proof of Delivery Upload
 class UploadProofView(APIView):
@@ -445,4 +511,12 @@ def waiter_dashboard(request):
 
     meals = Meal.objects.all()
     serializer = MealWithFeedbackSerializer(meals, many=True)
+    return Response(serializer.data)
+
+
+
+@action(detail=False, methods=['get'])
+def me(self, request):
+    profile = ReceptionistProfile.objects.get(user=request.user)
+    serializer = self.get_serializer(profile)
     return Response(serializer.data)

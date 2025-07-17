@@ -1,8 +1,8 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from .models import (
-    Meal, Feedback, ClockInRecord,
-    DeliveryPersonnelProfile, ProofOfDelivery
+    Meal, Feedback, ClockInRecord, ShiftRoster,ReceptionistProfile,
+    DeliveryPersonnelProfile, ProofOfDelivery, CRMCallLog   
 )
 
 User = get_user_model()
@@ -112,3 +112,40 @@ class ProofOfDeliverySerializer(serializers.ModelSerializer):
         model = ProofOfDelivery
         fields = ['id', 'order', 'image', 'uploaded_at']
         read_only_fields = ['uploaded_at']
+
+
+#ReceptionistProfileSerializer
+class ReceptionistProfileSerializer(serializers.ModelSerializer):
+    email = serializers.EmailField(source='user.email', read_only=True)
+    full_name = serializers.CharField(source='user.full_name', read_only=True)
+
+    class Meta:
+        model = ReceptionistProfile
+        fields = [
+            'id', 'email', 'full_name', 'profile_picture',
+            'gender', 'clock_in_time', 'clock_out_time',
+        ]
+
+
+# ShiftRosterSerializer
+class ShiftRosterSerializer(serializers.ModelSerializer):
+    receptionist_name = serializers.CharField(source='receptionist.user.full_name', read_only=True)
+
+    class Meta:
+        model = ShiftRoster
+        fields = [
+            'id', 'receptionist', 'receptionist_name',
+            'shift_date', 'shift_start', 'shift_end', 'is_on_duty',
+        ]
+
+#CRMCallLogSerializer
+class CRMCallLogSerializer(serializers.ModelSerializer):
+    receptionist_name = serializers.CharField(source='receptionist.user.full_name', read_only=True)
+
+    class Meta:
+        model = CRMCallLog
+        fields = [
+            'id', 'receptionist', 'receptionist_name',
+            'customer_name', 'phone_number', 'reason_for_call',
+            'follow_up_date', 'created_at', 'call_time','notes',
+        ]

@@ -1,5 +1,6 @@
-from django.urls import path 
+from django.urls import path, include
 from rest_framework.authtoken.views import obtain_auth_token
+from rest_framework.routers import DefaultRouter
 from .views import (
     # Meal & Menu
     public_menu,
@@ -28,7 +29,14 @@ from .views import (
     register_delivery_person,
     DeliveryPersonnelProfileView,
     UploadProofView,
+
+    #RECEPTIONIST
+    ReceptionistProfileViewSet, ShiftRosterViewSet, CRMCallLogViewSet
 )
+
+router = DefaultRouter()
+router.register(r'receptionists', ReceptionistProfileViewSet, basename='receptionists')
+
 
 urlpatterns = [
     # Auth
@@ -63,4 +71,8 @@ urlpatterns = [
     path('api/delivery/register/', register_delivery_person, name='register_delivery'),
     path('api/delivery/profile/', DeliveryPersonnelProfileView.as_view(), name='delivery_profile'),
     path('api/delivery/orders/<int:order_id>/upload-proof/', UploadProofView.as_view(), name='upload_proof'),
+
+     #Receptionist
+    path('api/', include(router.urls)),
+
 ]
