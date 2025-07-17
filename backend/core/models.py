@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.utils import timezone
+from django.contrib.auth import get_user_model
 from django.contrib.auth.models import BaseUserManager
 # ========================
 # Custom UserManager Model
@@ -47,51 +48,47 @@ class User(AbstractBaseUser, PermissionsMixin):
     def __str__(self):
         return self.email
     
+
 # ========================
-# Meal Model
+# Meal  Model
 # ========================
 class Meal(models.Model):
-    CATEGORY_CHOICES = [
-        ('main', 'Main Course'),
-        ('drink', 'Drink'),
-        ('dessert', 'Dessert'),
-        ('starter', 'Starter'),
-    ]
-
     name = models.CharField(max_length=100)
-    description = models.TextField(blank=True)
+    description = models.TextField()
     price = models.DecimalField(max_digits=8, decimal_places=2)
-    image = models.ImageField(upload_to='meal_images/', blank=True, null=True)
-    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='main')
+    image = models.ImageField(upload_to='meals/', null=True, blank=True)
     is_available = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return self.name
 
-
+    class Meta:
+        ordering = ['-created_at']
 # ========================
 # Order Model
 # ========================
+
 class Order(models.Model):
     STATUS_CHOICES = [
         ('pending', 'Pending'),
         ('preparing', 'Preparing'),
-        ('delivering', 'Delivering'),
+        ('ready', 'Ready for Delivery/Pickup'),
         ('delivered', 'Delivered'),
         ('cancelled', 'Cancelled'),
     ]
-
-    customer = models.ForeignKey(User, on_delete=models.CASCADE, related_name='orders')
+    
+    customer = models.ForeignKey(User, on_delete=models.CASCADE)
     meal = models.ForeignKey(Meal, on_delete=models.CASCADE)
-    created_at = models.DateTimeField(auto_now_add=True)
-    is_delivery = models.BooleanField(default=False)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
-    delivery_person = models.ForeignKey(
-        User, null=True, blank=True, on_delete=models.SET_NULL, related_name='deliveries', limit_choices_to={'role': 'delivery'})
-    proof_of_delivery = models.ImageField(upload_to='proofs/', null=True, blank=True)
+    is_delivery = models.BooleanField(default=False)
+    delivery_person = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='deliveries')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"Order #{self.id} - {self.meal.name} - {self.customer.username}"
+        return f"Order #{self.id} - {self.meal.name}"
 
 
 # ========================
@@ -101,6 +98,7 @@ class Feedback(models.Model):
     order = models.OneToOneField(Order, on_delete=models.CASCADE, related_name='feedback')
     meal = models.ForeignKey(Meal, on_delete=models.CASCADE)
     customer = models.ForeignKey(User, on_delete=models.CASCADE)
+    delivery_personnel = models.ForeignKey(User, on_delete=models.CASCADE, limit_choices_to={'role': 'delivery'}, related_name="delivery_feedback")
     rating = models.IntegerField()
     tip = models.DecimalField(max_digits=8, decimal_places=2, default=0)
     comment = models.TextField(blank=True)
@@ -200,3 +198,21 @@ class CRMCallLog(models.Model):
         return f"Call with {self.customer_name} at {self.call_time}"
 
 
+#online  customer
+User = get_user_model()
+class OnlineCustomerProfile(models.Model):
+    GENDER_CHOICES = [
+        ('male', 'Male'),
+        ('female', 'Female'),
+        ('other', 'Other'),
+    ]
+
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='online_profile')
+    full_name = models.CharField(max_length=100)
+    gender = models.CharField(max_length=10, choices=GENDER_CHOICES)
+    date_of_birth = models.DateField(null=True, blank=True)
+    location = models.CharField(max_length=200)  # town, estate, etc
+    member_since = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.full_name

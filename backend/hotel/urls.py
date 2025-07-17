@@ -21,6 +21,7 @@ from core.views import admin_orders_view
 
 urlpatterns = [
     path('', include('core.urls')),
+     path('api/', include('core.urls')),
     path('admin/', admin.site.urls),
 
 ]

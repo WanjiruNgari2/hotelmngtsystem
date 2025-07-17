@@ -1,8 +1,9 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from .models import (
-    Meal, Feedback, ClockInRecord, ShiftRoster,ReceptionistProfile,
-    DeliveryPersonnelProfile, ProofOfDelivery, CRMCallLog   
+    Meal, Order, Feedback, ClockInRecord, ShiftRoster,ReceptionistProfile,
+    DeliveryPersonnelProfile, 
+    ProofOfDelivery, CRMCallLog , OnlineCustomerProfile  
 )
 
 User = get_user_model()
@@ -89,7 +90,7 @@ class FeedbackSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Feedback
-        fields = ['id', 'meal', 'rating', 'tip', 'comment', 'customer_name', 'created_at']
+        fields = '__all__'
 
     def validate_rating(self, value):
         if not (1 <= value <= 5):
@@ -103,6 +104,11 @@ class MealSerializer(serializers.ModelSerializer):
     class Meta:
         model = Meal
         fields = ['id', 'name', 'description', 'price', 'image', 'category', 'is_available']
+
+class OrderSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Order
+        fields = '__all__'
 
 # ----------------------
 # Proof of Delivery Upload
@@ -149,3 +155,9 @@ class CRMCallLogSerializer(serializers.ModelSerializer):
             'customer_name', 'phone_number', 'reason_for_call',
             'follow_up_date', 'created_at', 'call_time','notes',
         ]
+
+#Online customer
+class OnlineCustomerProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = OnlineCustomerProfile
+        fields = '__all__'

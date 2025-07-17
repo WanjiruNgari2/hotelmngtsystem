@@ -9,7 +9,7 @@ from .models import (
     ClockInRecord,
     DeliveryPersonnelProfile,
     ReceptionistProfile,
-    ShiftRoster,
+    ShiftRoster, OnlineCustomerProfile,
     CRMCallLog
 )
 
@@ -36,10 +36,13 @@ class CRMCallLogAdmin(admin.ModelAdmin):
     list_filter = ('call_time',)
     search_fields = ('customer_name', 'notes')
 
-# Register other models similarly
+admin.site.register(Feedback)
+class FeedbackAdmin(admin.ModelAdmin):
+    list_display = ['order', 'rating', 'tip_amount', 'created_at']
+
+admin.site.register(OnlineCustomerProfile)
 admin.site.register(Meal)
 admin.site.register(Order)
 admin.site.register(WaiterProfile)
-admin.site.register(Feedback)
 admin.site.register(ClockInRecord)
 admin.site.register(DeliveryPersonnelProfile)

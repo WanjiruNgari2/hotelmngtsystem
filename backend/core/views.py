@@ -1,5 +1,4 @@
 # Django Core
-from rest_framework import filters  
 from django.shortcuts import render, redirect, get_object_or_404
 from django.db import models
 from django.contrib import messages
@@ -14,7 +13,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 
 
 # DRF
-from rest_framework import status, permissions, viewsets
+from rest_framework import filters , generics, status, permissions, viewsets 
 from rest_framework.decorators import api_view, permission_classes, authentication_classes, action
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.response import Response
@@ -23,14 +22,21 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.views import APIView
 
 # Local Models
-from .models import User, Meal, Order, WaiterProfile, Feedback, ClockInRecord, DeliveryPersonnelProfile, ReceptionistProfile, ShiftRoster, CRMCallLog
+from .utils import is_customer_birthday
+from .models import User, Meal, Order, WaiterProfile, Feedback, ClockInRecord, DeliveryPersonnelProfile, ReceptionistProfile, ShiftRoster, CRMCallLog, OnlineCustomerProfile
 from .forms import MealForm, FeedbackForm
+from .utils import (
+    is_customer_birthday,
+    remember_customer_session,
+    get_remembered_customer,
+    was_greeted_today
+)
 from .serializers import (
-    FeedbackSerializer, 
+    FeedbackSerializer, OrderSerializer,
     MealWithFeedbackSerializer, 
     MealSerializer, ReceptionistProfileSerializer, CRMCallLogSerializer, ShiftRosterSerializer,
     ClockInRecordSerializer,
-    DeliveryProfileSerializer
+    DeliveryProfileSerializer, OnlineCustomerProfileSerializer,
 )
 
 # ======================
@@ -260,6 +266,17 @@ class UploadProofView(APIView):
             return Response({'message': 'Proof uploaded successfully'})
         return Response(serializer.errors, status=400)
 
+
+class OnlineCustomerProfileListCreateView(generics.ListCreateAPIView):
+    queryset = OnlineCustomerProfile.objects.all()
+    serializer_class = OnlineCustomerProfileSerializer
+    permission_classes = [permissions.AllowAny]  #  later restrict this
+
+class OnlineCustomerProfileDetailView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = OnlineCustomerProfile.objects.all()
+    serializer_class = OnlineCustomerProfileSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
 # Admin Reports
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -317,6 +334,13 @@ def admin_stats_view(request):
     })
 
 # Meal Availability Toggle
+@api_view(['GET'])
+def available_meals(request):
+    meals = Meal.objects.filter(is_available=True)
+    serializer = MealSerializer(meals, many=True)
+    return Response(serializer.data)
+
+
 @api_view(['PATCH'])
 @permission_classes([IsAuthenticated])
 def toggle_meal_availability_patch(request, pk):
@@ -520,3 +544,109 @@ def me(self, request):
     profile = ReceptionistProfile.objects.get(user=request.user)
     serializer = self.get_serializer(profile)
     return Response(serializer.data)
+
+
+class AvailableMealListView(generics.ListAPIView):
+    queryset = Meal.objects.filter(is_available=True)
+    serializer_class = MealSerializer
+
+class FeedbackCreateView(generics.CreateAPIView):
+    queryset = Feedback.objects.all()
+    serializer_class = FeedbackSerializer
+    permission_classes = [IsAuthenticated]
+
+class CustomerOrderHistoryView(generics.ListAPIView):
+    serializer_class = OrderSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return Order.objects.filter(customer=self.request.user).order_by('-created_at')
+
+
+class ChangeDeliveryPersonView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, order_id):
+        try:
+            order = Order.objects.get(id=order_id, customer=request.user)
+
+            if order.status != 'pending':
+                return Response({'error': 'Cannot change delivery person after order is processed.'}, status=400)
+
+            new_delivery_id = request.data.get('new_delivery_personnel_id')
+            new_delivery = User.objects.get(id=new_delivery_id, role='delivery')
+
+            order.delivery_personnel = new_delivery
+            order.save()
+
+            return Response({'message': 'Delivery person updated successfully.'})
+        except Order.DoesNotExist:
+            return Response({'error': 'Order not found.'}, status=404)
+        except User.DoesNotExist:
+            return Response({'error': 'New delivery person not found.'}, status=404)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def customer_order_history(request):
+    customer = request.user
+    orders = Order.objects.filter(user=customer).order_by('-created_at')
+    serializer = OrderSerializer(orders, many=True)
+    return Response(serializer.data)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def give_feedback(request, order_id):
+    try:
+        order = Order.objects.get(id=order_id, user=request.user)
+    except Order.DoesNotExist:
+        return Response({"error": "Order not found or unauthorized."}, status=404)
+
+    serializer = FeedbackSerializer(data=request.data)
+    if serializer.is_valid():
+        serializer.save(order=order, customer=request.user)
+        return Response(serializer.data, status=201)
+    return Response(serializer.errors, status=400)
+
+
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated])
+def change_delivery_person(request, order_id):
+    try:
+        order = Order.objects.get(id=order_id, user=request.user)
+    except Order.DoesNotExist:
+        return Response({"error": "Order not found."}, status=404)
+
+    if order.status != 'Pending':
+        return Response({"error": "You can only change delivery person for pending orders."}, status=400)
+
+    new_delivery_id = request.data.get("delivery_person_id")
+    if not new_delivery_id:
+        return Response({"error": "No delivery person specified."}, status=400)
+
+    try:
+        new_delivery = User.objects.get(id=new_delivery_id, role='delivery')
+    except User.DoesNotExist:
+        return Response({"error": "Invalid delivery person ID."}, status=404)
+
+    order.delivery_person = new_delivery
+    order.save()
+    return Response({"message": "Delivery person updated successfully."})
+
+
+
+def customer_dashboard(request):
+    user = request.user
+    profile = user.onlinecustomerprofile  # assuming you’re using OneToOneField
+    remember_customer_session(request, profile.id)
+
+    context = {"name": user.first_name}
+
+    if not was_greeted_today(request):
+        if is_customer_birthday(profile.birthday):
+            context["birthday_message"] = f"🎉 Happy Birthday, {user.first_name}!"
+        else:
+            context["welcome_back"] = f"👋 Welcome back, {user.first_name}!"
+
+    return render(request, 'customer/dashboard.html', context)
