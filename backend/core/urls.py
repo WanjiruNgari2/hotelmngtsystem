@@ -38,12 +38,16 @@ from .views import (
     # Online Customer
     OnlineCustomerProfileListCreateView, customer_order_history, give_feedback, change_delivery_person,
     OnlineCustomerProfileDetailView, CustomerOrderHistoryView,
+
+     #onsite customer
+     OnsiteCustomerProfileViewSet
 )
 
 router = DefaultRouter()
 router.register(r'receptionists', ReceptionistProfileViewSet, basename='receptionists')
 router.register(r'shift-rosters', ShiftRosterViewSet, basename='shift-rosters')
 router.register(r'crm-calls', CRMCallLogViewSet, basename='crm-calls')
+router.register(r'onsite-customers', OnsiteCustomerProfileViewSet, basename='onsite-customer')
 
 
 urlpatterns = [

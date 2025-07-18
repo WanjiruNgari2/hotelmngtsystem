@@ -10,7 +10,7 @@ from .models import (
     DeliveryPersonnelProfile,
     ReceptionistProfile,
     ShiftRoster, OnlineCustomerProfile,
-    CRMCallLog
+    CRMCallLog, OnsiteCustomerProfile
 )
 
 @admin.register(User)
@@ -40,9 +40,22 @@ admin.site.register(Feedback)
 class FeedbackAdmin(admin.ModelAdmin):
     list_display = ['order', 'rating', 'tip_amount', 'created_at']
 
+
+@admin.register(OnsiteCustomerProfile)
+class OnsiteCustomerAdmin(admin.ModelAdmin):
+    list_display = ['full_name', 'table_number', 'waiter', 'joined_at']
+    search_fields = ['full_name', 'table_number']
+    list_filter = ['gender', 'waiter']
+
+
 admin.site.register(OnlineCustomerProfile)
 admin.site.register(Meal)
 admin.site.register(Order)
 admin.site.register(WaiterProfile)
+class WaiterProfile(admin.ModelAdmin):
+    list_display = ('user', 'gender', 'full_name')
+    raw_id_fields = ('user',)
+    search_fields = ('user__email',)
+
 admin.site.register(ClockInRecord)
 admin.site.register(DeliveryPersonnelProfile)

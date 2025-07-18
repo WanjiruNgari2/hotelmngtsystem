@@ -2,7 +2,7 @@ from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from .models import (
     Meal, Order, Feedback, ClockInRecord, ShiftRoster,ReceptionistProfile,
-    DeliveryPersonnelProfile, 
+    DeliveryPersonnelProfile, OnsiteCustomerProfile, 
     ProofOfDelivery, CRMCallLog , OnlineCustomerProfile  
 )
 
@@ -161,3 +161,15 @@ class OnlineCustomerProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = OnlineCustomerProfile
         fields = '__all__'
+
+#onsite customer
+class OnsiteCustomerProfileSerializer(serializers.ModelSerializer):
+    waiter_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = OnsiteCustomerProfile
+        fields = '__all__'
+        read_only_fields = ['user', 'joined_at']
+
+    def get_waiter_name(self, obj):
+        return obj.waiter.full_name if obj.waiter else None

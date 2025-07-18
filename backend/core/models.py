@@ -98,7 +98,14 @@ class Feedback(models.Model):
     order = models.OneToOneField(Order, on_delete=models.CASCADE, related_name='feedback')
     meal = models.ForeignKey(Meal, on_delete=models.CASCADE)
     customer = models.ForeignKey(User, on_delete=models.CASCADE)
-    delivery_personnel = models.ForeignKey(User, on_delete=models.CASCADE, limit_choices_to={'role': 'delivery'}, related_name="delivery_feedback")
+    delivery_personnel = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        limit_choices_to={'role': 'delivery'},
+        related_name='feedbacks'
+    )
     rating = models.IntegerField()
     tip = models.DecimalField(max_digits=8, decimal_places=2, default=0)
     comment = models.TextField(blank=True)
@@ -216,3 +223,23 @@ class OnlineCustomerProfile(models.Model):
 
     def __str__(self):
         return self.full_name
+    
+
+
+class OnsiteCustomerProfile(models.Model):
+    GENDER_CHOICES = [
+        ('male', 'Male'),
+        ('female', 'Female'),
+        ('other', 'Other'),
+    ]
+
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='onsite_profile')
+    full_name = models.CharField(max_length=100)
+    gender = models.CharField(max_length=10, choices=GENDER_CHOICES)
+    table_number = models.CharField(max_length=20)
+    waiter = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, limit_choices_to={'role': 'waiter'})
+    joined_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.full_name} at Table {self.table_number}"
+

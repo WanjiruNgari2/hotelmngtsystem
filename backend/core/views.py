@@ -23,7 +23,7 @@ from rest_framework.views import APIView
 
 # Local Models
 from .utils import is_customer_birthday
-from .models import User, Meal, Order, WaiterProfile, Feedback, ClockInRecord, DeliveryPersonnelProfile, ReceptionistProfile, ShiftRoster, CRMCallLog, OnlineCustomerProfile
+from .models import User, Meal, Order, WaiterProfile, Feedback, OnsiteCustomerProfile, ClockInRecord, DeliveryPersonnelProfile, ReceptionistProfile, ShiftRoster, CRMCallLog, OnlineCustomerProfile
 from .forms import MealForm, FeedbackForm
 from .utils import (
     is_customer_birthday,
@@ -35,7 +35,7 @@ from .serializers import (
     FeedbackSerializer, OrderSerializer,
     MealWithFeedbackSerializer, 
     MealSerializer, ReceptionistProfileSerializer, CRMCallLogSerializer, ShiftRosterSerializer,
-    ClockInRecordSerializer,
+    ClockInRecordSerializer, OnsiteCustomerProfileSerializer,
     DeliveryProfileSerializer, OnlineCustomerProfileSerializer,
 )
 
@@ -544,6 +544,26 @@ def me(self, request):
     profile = ReceptionistProfile.objects.get(user=request.user)
     serializer = self.get_serializer(profile)
     return Response(serializer.data)
+
+
+class OnsiteCustomerProfileViewSet(viewsets.ModelViewSet):
+    queryset = OnsiteCustomerProfile.objects.all()
+    serializer_class = OnsiteCustomerProfileSerializer
+    permission_classes = [IsAuthenticated]
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.role == 'admin' or user.is_staff:
+            return OnsiteCustomerProfile.objects.all()
+        elif user.role == 'receptionist':
+            return OnsiteCustomerProfile.objects.all()
+        elif user.role == 'onsite_customer':
+            return OnsiteCustomerProfile.objects.filter(user=user)
+        else:
+            return OnsiteCustomerProfile.objects.none()
 
 
 class AvailableMealListView(generics.ListAPIView):
