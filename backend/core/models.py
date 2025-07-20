@@ -1,5 +1,6 @@
 from django.db import models
-from django.contrib.auth.models import AbstractUser
+from django.db.models import Sum
+from django.contrib.auth.models import User, UserManager
 from django.utils import timezone
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import BaseUserManager
@@ -112,19 +113,19 @@ class Feedback(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"Feedback by {self.customer.username} - Rating {self.rating}"
+        return f"Feedback by {self.customer.email} - Rating {self.rating}"
 
 
 # ========================
 # Clock-In Records for Waiters
 # ========================
 class ClockInRecord(models.Model):
-    waiter = models.ForeignKey(User, on_delete=models.CASCADE, related_name='clock_records')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='clock_records')
     clock_in_time = models.DateTimeField(default=timezone.now)
     clock_out_time = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
-        return f"{self.waiter.username} - In: {self.clock_in_time} Out: {self.clock_out_time}"
+        return f"{self.user.email} - In: {self.clock_in_time} Out: {self.clock_out_time}"
 
 
 # ========================
@@ -151,11 +152,22 @@ class DeliveryPersonnelProfile(models.Model):
 
 class WaiterProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
-    age = models.IntegerField(null=True, blank=True)
-    gender = models.CharField(max_length=10, null=True, blank=True)
+    table_assigned = models.CharField(max_length=20, default="Unassigned")
+    age = models.PositiveIntegerField(null=True, blank=True)
+    gender = models.CharField(max_length=10, choices=[("Male", "Male"), ("Female", "Female")], blank=True)
+    
+    
+    def total_tips(self):
+        # Use 'tip' instead of 'tip_amount'
+        result = self.user.feedback_set.aggregate(total=Sum('tip'))['total']
+        return result if result is not None else 0  # Handle None case
+
+    def votes_received(self):
+        return self.user.feedback_set.count()
 
     def __str__(self):
-        return f"WaiterProfile: {self.user.username}"
+        return f"{getattr(self.user, 'email', 'No Email')} - Table {self.table_assigned}"
+
 
 class ProofOfDelivery(models.Model):
     order = models.OneToOneField('Order', on_delete=models.CASCADE, related_name='proof')
