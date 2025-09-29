@@ -315,3 +315,4 @@ urlpatterns += [
 ```
 
 Access Swagger at: [http://127.0.0.1:8000/swagger/](http://127.0.0.1:8000/swagger/) or Redoc at `/redoc/`
+
